@@ -1,0 +1,328 @@
+# IST707 Assignment 1 - nrangnan #
+Shiny app link: https://nrangnan.shinyapps.io/Nisha/
+``` {r}
+attritionDF <- read.csv("employee_attrition.csv")
+library(ggplot2)
+library(dplyr)
+library(arules)
+library(arulesViz)
+```
+Structure of the data
+```{r}
+str(attritionDF)
+```
+
+We have total 9 NA's in the overall dataset
+```{r}
+sum(is.na(attritionDF))
+```
+
+
+
+Use Summary() to view details about each attribute in the dataset, such as Min, Max, Median, etc. for quantitative variables;
+and frequency of each term for categorical variables.
+It also tells you the number of NA's in each column
+```{r}
+summary(attritionDF) 
+```
+
+
+# Data Cleaning & preprocessing #
+
+1. We can see from summary() output that DistanceFromHome attribute has 2 NA's.
+To deal with these, we can safely replace these NA's by median of distance from home of all employees.
+```{r}
+attritionDF <- attritionDF %>%
+  mutate(DistanceFromHome = replace(DistanceFromHome, is.na(DistanceFromHome), median(DistanceFromHome, na.rm=TRUE)))
+```
+
+2.JobLevel - We have 1 NA in the JobLevel column.
+we can set job level as -1 so that it doesn't impact the support % when we use apriori.
+```{r}
+attritionDF <- attritionDF %>%
+  mutate(JobLevel = replace(JobLevel, is.na(JobLevel), -1))
+```
+
+3. PercentSalaryHike - we have 1 NA.
+Replace it with median of the attribute.
+```{r}
+attritionDF <- attritionDF %>%
+  mutate(PercentSalaryHike = replace(PercentSalaryHike, is.na(PercentSalaryHike), median(PercentSalaryHike, na.rm=TRUE)))
+```
+
+4.PerformanceRating - We have 1 NA in the PerformanceRating column
+we can set rating as -1 so that it doesn't impact the support % when we use apriori
+```{r}
+attritionDF <- attritionDF %>%
+  mutate(PerformanceRating = replace(PerformanceRating, is.na(PerformanceRating), -1))
+```
+
+4.RelationshipSatisfaction - We have 1 NA in the RelationshipSatisfaction column
+we can set satisfaction rating as -1 so that it doesn't impact the support % when we use apriori
+```{r}
+attritionDF <- attritionDF %>%
+  mutate(RelationshipSatisfaction = replace(RelationshipSatisfaction, is.na(RelationshipSatisfaction), -1))
+```
+
+5. TotalWorkingYears - 2 NAs
+You can replace it with their YearsInCurrentRole (assuming that they have been in this role always).
+```{r}
+attritionDF <- attritionDF %>%
+  mutate(TotalWorkingYears = replace(TotalWorkingYears, is.na(TotalWorkingYears), YearsInCurrentRole[which(is.na(TotalWorkingYears))]))
+```
+
+6. Years Since Last Promotion -
+we can set it as -1 so that it doesn't impact the support % when we use apriori.
+```{r}
+attritionDF <- attritionDF %>%
+  mutate(YearsSinceLastPromotion = replace(YearsSinceLastPromotion, is.na(YearsSinceLastPromotion), -1))
+```
+
+We dont have any more NA's
+```{r}
+sum(is.na(attritionDF))
+```
+
+Lets remove duplicates, if any
+```{r}
+attritionDF <- attritionDF %>%
+  distinct()
+dim(attritionDF) 
+```
+There were no duplicate rows (as dimensions of the data remain the same).
+
+
+# Exploratory Data Analysis #
+
+Explore Attrition rate
+```{r}
+g <- ggplot(attritionDF, aes(x=attritionDF$Attrition))
+g <- g + geom_bar()
+g
+```
+
+1. Age
+```{r}
+gg1 <- ggplot(attritionDF, aes(x=attritionDF$Attrition, y=attritionDF$Age)) + geom_boxplot()
+gg1
+```
+
+2. BusinessTravel
+```{r}
+g2 <- ggplot(attritionDF, aes(x=attritionDF$BusinessTravel, fill = attritionDF$Attrition))
+g2 <- g2 + geom_bar()
+g2
+```
+
+3. Department wise attrition
+```{r}
+g3 <- ggplot(attritionDF, aes(x=attritionDF$Department, fill= attritionDF$Attrition))
+g3 <- g3 + geom_bar(position = "dodge")
+g3
+```
+
+4. Distance from home
+```{r}
+gg4 <- ggplot(attritionDF, aes(x=attritionDF$Attrition, y=attritionDF$DistanceFromHome)) + geom_boxplot()
+gg4
+```
+
+5. EducationLevel
+```{r}
+g5 <- ggplot(attritionDF, aes(x=attritionDF$Education, fill= attritionDF$Attrition))
+g5 <- g5 + geom_bar(position = "dodge")
+g5
+```
+
+6. EducationField
+```{r}
+g6 <- ggplot(attritionDF, aes(x=attritionDF$EducationField, fill= attritionDF$Attrition))
+g6 <- g6 + geom_bar(position = "dodge")
+g6
+```
+
+7. Environment Satisfaction
+```{r}
+g7 <- ggplot(attritionDF, aes(x=attritionDF$EnvironmentSatisfaction, fill= attritionDF$Attrition))
+g7 <- g7 + geom_bar(position = "dodge")
+g7
+```
+
+8. Gender
+```{r}
+g8 <- ggplot(attritionDF, aes(x=attritionDF$Gender, fill= attritionDF$Attrition))
+g8 <- g8 + geom_bar(position = "dodge")
+g8
+```
+
+9. JobInvolvement
+```{r}
+g9 <- ggplot(attritionDF, aes(x=attritionDF$JobInvolvement, fill= attritionDF$Attrition))
+g9 <- g9 + geom_bar(position = "dodge")
+g9
+```
+The percentage for job attrition is the least amongst employees that are highly involved in their job
+
+10. JobLevel
+```
+g10 <- ggplot(attritionDF, aes(x=attritionDF$JobLevel, fill= attritionDF$Attrition))
+g10 <- g10 + geom_bar(position = "dodge")
+g10
+```
+
+11. JobRole
+```{r}
+g11 <- ggplot(attritionDF, aes(x=attritionDF$JobRole, fill= attritionDF$Attrition))
+g11 <- g11 + geom_bar(position = "dodge")
+g11 <- g11 + theme(axis.text.x = element_text(angle = 60))
+g11
+```
+
+12. JobSatisfaction
+```{r}
+g12 <- ggplot(attritionDF, aes(x=attritionDF$JobSatisfaction, fill= attritionDF$Attrition))
+g12 <- g12 + geom_bar(position = "dodge")
+g12
+```
+The more satisfied you are with your job, the less likely you are to leave it
+
+13. Marital Status
+```{r}
+g13 <- ggplot(attritionDF, aes(x=attritionDF$MaritalStatus, fill= attritionDF$Attrition))
+g13 <- g13 + geom_bar(position = "dodge")
+g13
+```
+
+14. MonthlyIncome
+```{r}
+gg14 <- ggplot(attritionDF, aes(x=attritionDF$Attrition, y=attritionDF$MonthlyIncome)) + geom_boxplot()
+gg14
+```
+
+15. NumCompaniesWorked
+```{r}
+g15 <- ggplot(attritionDF, aes(x=attritionDF$NumCompaniesWorked, fill= attritionDF$Attrition))
+g15 <- g15 + geom_bar(position = "dodge")
+g15
+```
+
+16. oVERTIME
+```{r}
+g16 <- ggplot(attritionDF, aes(x=attritionDF$OverTime, fill= attritionDF$Attrition))
+g16 <- g16 + geom_bar(position = "dodge")
+g16
+```
+People who work overtime are more likely to leave
+
+17. PerformanceRating
+```{r}
+g17 <- ggplot(attritionDF, aes(x=attritionDF$PerformanceRating, fill= attritionDF$Attrition))
+g17 <- g17 + geom_bar(position = "dodge")
+g17
+```
+
+18. Relationship satisfaction
+```{r}
+g18 <- ggplot(attritionDF, aes(x=attritionDF$RelationshipSatisfaction, fill= attritionDF$Attrition))
+g18 <- g18 + geom_bar(position = "dodge")
+g18
+```
+
+19. Total working years
+```{r}
+gg19 <- ggplot(attritionDF, aes(x=attritionDF$Attrition, y=attritionDF$TotalWorkingYears)) + geom_boxplot()
+gg19
+```
+
+20. WorkLifeBalance
+```{r}
+g20 <- ggplot(attritionDF, aes(x=attritionDF$WorkLifeBalance, fill= attritionDF$Attrition))
+g20 <- g20 + geom_bar(position = "dodge")
+g20
+```
+Percentage of attrition goes down as the level of work-life balance goes up
+
+21. YearsAtCompany
+```{r}
+gg21 <- ggplot(attritionDF, aes(x=attritionDF$Attrition, y=attritionDF$YearsAtCompany)) + geom_boxplot()
+gg21
+```
+
+22. Years since last promotion
+```{r}
+gg22 <- ggplot(attritionDF, aes(x=attritionDF$Attrition, y=attritionDF$YearsSinceLastPromotion)) + geom_boxplot()
+gg22
+```
+
+23Years with current manager
+```{r}
+gg23 <- ggplot(attritionDF, aes(x=attritionDF$Attrition, y=attritionDF$YearsWithCurrManager)) + geom_boxplot()
+gg23
+```
+
+
+# Data transformation - Deleting columns with redundant data, conversion of certain column data to factors #
+```{r}
+attritionDF$Education <- as.factor(attritionDF$Education)
+attDF1 <- attritionDF[,-9]
+
+attDF1$JobInvolvement <- as.factor(attDF1$JobInvolvement)
+attDF1$PerformanceRating <- as.factor(attDF1$PerformanceRating)
+
+attDF1 <- attDF1[,-26]
+
+attDF1$StockOptionLevel <- as.factor(attDF1$StockOptionLevel) 
+attDF1$WorkLifeBalance <- as.factor(attDF1$WorkLifeBalance)
+
+attDF1 <- attDF1[,-21]
+```
+
+# Association rules mining & tuning of hyperparameters  #
+## Rules for Attrition = No ##
+```{r}
+rules <- apriori(attDF1, parameter = list(supp = 0.5, conf = 0.8, target = "rules", minlen=2), appearance = list(rhs="Attrition=No"))
+rules
+rules_lift <- sort(rules, by = "lift", decreasing = TRUE)
+inspect(head(rules_lift))
+a <- plot(rules)
+print(a)
+```
+
+Decrease number of rules by increasing support value
+```{r}
+rules <- apriori(attDF1, parameter = list(supp = 0.56, conf = 0.8, target = "rules", minlen=2), appearance = list(rhs="Attrition=No"))
+rules
+rules_lift <- sort(rules, by = "lift", decreasing = TRUE)
+inspect(head(rules_lift))
+a <- plot(rules)
+print(a)
+``` 
+
+## Rules for Attrition = Yes ##
+```{r}
+rules1 <- apriori(attDF1, parameter = list(supp = 0.2, conf = 0.5, target = "rules", minlen=2), appearance = list(rhs="Attrition=Yes"))
+rules1
+```
+received 0 rules, decrease support value
+
+```{r}
+rules1 <- apriori(attDF1, parameter = list(supp = 0.043, conf = 0.5, target = "rules", minlen=2), appearance = list(rhs="Attrition=Yes"))
+rules1
+rules_lift1 <- sort(rules1, by = "lift", decreasing = TRUE)
+inspect(head(rules_lift1))
+a <- plot(rules1)
+print(a)
+```
+
+
+# Interpretation of attrition=Yes #
+ Employees are likely to leave their job if they're not at a high job position, paid low monthly income and they work overtime.
+Employees are more likely to leave if they're a young working crowd, at a job level 1 or 2, with not too high work experience (0 to 6 years), having low number of years ar the company; 
+i.e. if they have not been at the company for very long, and they have been promoted recently, they are likely to switch the job to get a better position and salary.
+Employees that have low montly income, who work overtime are more likely to leave the job.
+
+# Interpretation of attrition=No #
+Senior position employees are less likely to leave the company.
+Employees who do not work overtime are less likely to leave the company.
+Research & Development employees are less likely to leave the company.
+Employees that are not required to travel often (travel_rarely) are less likely to leave the company.
